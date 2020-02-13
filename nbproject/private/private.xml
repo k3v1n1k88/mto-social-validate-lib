@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project-private xmlns="http://www.netbeans.org/ns/project-private/1">
+    <editor-bookmarks xmlns="http://www.netbeans.org/ns/editor-bookmarks/2" lastBookmarkId="0"/>
+    <open-files xmlns="http://www.netbeans.org/ns/projectui-open-files/2">
+        <group>
+            <file>file:/home/vanntl/c-projects/mto-social-validate-lib/src/mto/social/validate/lib/type/LoginType.java</file>
+            <file>file:/home/vanntl/c-projects/mto-social-validate-lib/src/mto/social/validate/lib/profile/AppleProfile.java</file>
+            <file>file:/home/vanntl/c-projects/mto-social-validate-lib/src/mto/social/validate/lib/MtoSocialValidateLib.java</file>
+            <file>file:/home/vanntl/c-projects/mto-social-validate-lib/gen-java/mto/passport/profilev2/db/thrift/PPProfileDBService.java</file>
+            <file>file:/home/vanntl/c-projects/mto-social-validate-lib/src/mto/social/validate/lib/type/AppleGrantType.java</file>
+            <file>file:/home/vanntl/c-projects/mto-social-validate-lib/src/mto/social/validate/lib/profile/AbstractProfile.java</file>
+            <file>file:/home/vanntl/c-projects/mto-social-validate-lib/src/mto/social/validate/lib/profile/validator/AbstractCallHttp.java</file>
+            <file>file:/home/vanntl/c-projects/mto-social-validate-lib/src/mto/social/validate/lib/profile/validator/AppleValidator.java</file>
+        </group>
+    </open-files>
+</project-private>
