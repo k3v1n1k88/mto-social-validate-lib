@@ -5,13 +5,12 @@
  */
 package mto.social.validate.lib.profile.validator;
 
-import com.google.api.client.http.javanet.NetHttpTransport;
-import com.google.api.client.json.JsonFactory;
-import com.google.api.client.json.jackson2.JacksonFactory;
-import com.google.api.client.repackaged.com.google.common.base.Strings;
+
+import com.google.common.base.Strings;
 import com.google.gson.annotations.SerializedName;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jws;
+import io.jsonwebtoken.JwsHeader;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.SignatureAlgorithm;
 import java.io.DataInputStream;
@@ -32,6 +31,8 @@ import java.util.Date;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import lombok.ToString;
+import mto.social.validate.lib.exception.ValidateTokenException;
 import mto.social.validate.lib.profile.AppleProfile;
 import mto.social.validate.lib.type.AppleGrantType;
 import mto.social.validate.lib.utils.CommonUtils;
@@ -48,39 +49,33 @@ import org.json.simple.JSONObject;
  */
 public class AppleValidator extends AbstractCallHttp {
 
-    private static final NetHttpTransport transport = new NetHttpTransport();
-    private static final JsonFactory jsonFactory = new JacksonFactory();
-
     private static final Logger logger = Logger.getLogger(AppleValidator.class);
 
-    private static String createAppleClientSecret(String appleKey, String appleKeyID, String teamID, String appleAudience, String appleClientID) {
+    private static String createAppleClientSecret(String appleKey, String appleKeyID, String teamID, String appleAudience, String appleClientID, long expireTimeMillius) {
         try {
             byte[] keyBytes = Base64.decodeBase64(appleKey); // text key đã remove header, footer & new line
             final KeyFactory keyFactory = KeyFactory.getInstance("EC");
             final PrivateKey privateKey = keyFactory.generatePrivate(new PKCS8EncodedKeySpec(keyBytes));
-
             return Jwts.builder()
-                    .setHeaderParam("kid", appleKeyID)
+                    .setHeaderParam(JwsHeader.KEY_ID, appleKeyID)
                     .setIssuer(teamID)
                     .setIssuedAt(new Date(System.currentTimeMillis()))
-                    .setExpiration(new Date(System.currentTimeMillis() + (3600L * 1000L)))
+                    .setExpiration(new Date(System.currentTimeMillis() + expireTimeMillius))
                     .setAudience(appleAudience)
-                    .claim("sub", appleClientID)
+                    .setSubject(appleClientID)
                     .signWith(SignatureAlgorithm.ES256, privateKey)
                     .compact();
         } catch (Exception ex) {
-            System.out.println("ex:  " + ex.getMessage());
             logger.error(ex.getMessage(), ex);
         }
-
         return null;
     }
 
-    private static AppleProfile getProfileFromIdToken(String gameID, String idToken, String rsaN, String rsaE) {
+    private static AppleProfile getProfileFromIdToken(String gameID, String idToken, String primeN, String primeE) {
         try {
             // gen public key từ n, e
-            RSAPublicKeySpec pubSpec = new RSAPublicKeySpec(new BigInteger(1, Base64.decodeBase64(rsaN)),
-                    new BigInteger(1, Base64.decodeBase64(rsaE)));
+            RSAPublicKeySpec pubSpec = new RSAPublicKeySpec(new BigInteger(1, Base64.decodeBase64(primeN)),
+                    new BigInteger(1, Base64.decodeBase64(primeE)));
             KeyFactory keyFactory = KeyFactory.getInstance("RSA");
             PublicKey pubKey = keyFactory.generatePublic(pubSpec);
 
@@ -103,7 +98,7 @@ public class AppleValidator extends AbstractCallHttp {
         return null;
     }
     
-    public static AppleAuthTokenResp validateToken(String clientID, String clientSecret, String oauthCode, String grantType){
+    public static AppleTokenResponse validateToken(String clientID, String clientSecret, String oauthCode, String grantType){
         try {
             String url = "https://appleid.apple.com/auth/token";
             List<NameValuePair> params = new ArrayList<>();
@@ -113,13 +108,16 @@ public class AppleValidator extends AbstractCallHttp {
             params.add(new BasicNameValuePair("grant_type", grantType));
             String query = URLEncodedUtils.format(params, StandardCharsets.UTF_8.name());
 
-            String rs = doHttp(url, "POST", query);
+            String rs = CommonUtils.doHttp(url, "POST", query);
             logger.info("validateAppleAuth req - url: " + url + " - query:" + query + " rs: " + rs);
-            return CommonUtils.jsonToObject(rs, AppleAuthTokenResp.class);
+            AppleTokenResponse appleAuthTokenResp =  CommonUtils.jsonToObject(rs, AppleTokenResponse.class);
+            if(appleAuthTokenResp == null){
+                throw new ValidateTokenException("Fail to parse response to AppleAuthTokenResp.class. Invalid response: "+ rs);
+            }
+            return appleAuthTokenResp;
         } catch (Exception ex) {
-            logger.error(ex.getMessage(), ex);
+            throw new ValidateTokenException(ex.getMessage(), ex);
         }
-        return null;
     }
 
     public static AppleProfile validateAppleAuth(
@@ -132,9 +130,10 @@ public class AppleValidator extends AbstractCallHttp {
             String oauthCode,
             String n,
             String e,
+            long expireTimeMillius,
             AppleGrantType appleGrantType) {
         try {
-            String clientSecret = createAppleClientSecret(appleKey, appleKeyID, teamID, appleAudience, clientID);
+            String clientSecret = createAppleClientSecret(appleKey, appleKeyID, teamID, appleAudience, clientID, expireTimeMillius);
             if (Strings.isNullOrEmpty(clientSecret)) {
                 logger.error("createAppleClientSecret return null");
                 return null;
@@ -148,10 +147,10 @@ public class AppleValidator extends AbstractCallHttp {
             params.add(new BasicNameValuePair("grant_type", appleGrantType.getType()));
             String query = URLEncodedUtils.format(params, StandardCharsets.UTF_8.name());
 
-            String rs = doHttp(url, "POST", query);
+            String rs = CommonUtils.doHttp(url, "POST", query);
             logger.info("validateAppleAuth req - url: " + url + " - query:" + query + " rs: " + rs);
             //
-            AppleAuthTokenResp token = CommonUtils.jsonToObject(rs, AppleAuthTokenResp.class);
+            AppleTokenResponse token = CommonUtils.jsonToObject(rs, AppleTokenResponse.class);
             if (token == null || Strings.isNullOrEmpty(token.idToken)) {
                 logger.error("Invalid AppleAuthTokenResp - token: " + CommonUtils.objectToString(token));
                 return null;
@@ -169,8 +168,9 @@ public class AppleValidator extends AbstractCallHttp {
 
         return null;
     }
-
-    public static class AppleAuthTokenResp {
+    
+    @ToString
+    public static class AppleTokenResponse {
 
         @SerializedName("access_token")
         public String accessToken;
@@ -182,5 +182,7 @@ public class AppleValidator extends AbstractCallHttp {
         public String refreshToken;
         @SerializedName("id_token")
         public String idToken;
+
+        
     }
 }

@@ -19,9 +19,9 @@ import org.apache.log4j.Logger;
  * @author huuloc.tran89
  */
 public abstract class AbstractCallHttp {
-
-    private static Logger logger = Logger.getLogger(AbstractCallHttp.class);
-
+    
+    public static Logger logger = Logger.getLogger(AbstractCallHttp.class);
+    
     public static String doHttp(String urlStr, String method, String param) {
         try {
             URL url = new URL(urlStr);
